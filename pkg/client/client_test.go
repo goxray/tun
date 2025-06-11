@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/goxray/core/network/route"
-	"github.com/lilendian0x00/xray-knife/v2/xray"
+	xkp "github.com/lilendian0x00/xray-knife/v3/pkg/protocol"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -20,11 +20,17 @@ import (
 
 func TestConnect_InvalidLink(t *testing.T) {
 	cl := Client{
-		cfg: Config{Logger: slog.New(slog.NewTextHandler(os.Stdout, nil))},
+		cfg: Config{
+			Logger:       slog.New(slog.NewTextHandler(os.Stdout, nil)),
+			InboundProxy: &Proxy{},
+		},
 	}
 
 	err := cl.Connect("invalid_link")
-	require.ErrorContains(t, err, "parse config link: invalid protocol")
+	require.ErrorContains(t, err, "invalid config: protocol create:")
+
+	err = cl.Connect("vless://example.com") // no port
+	require.ErrorContains(t, err, "invalid config: parse:")
 }
 
 func TestDisconnect_NonConnected(t *testing.T) {
@@ -135,7 +141,7 @@ func TestDisconnect_CtxTimeout(t *testing.T) {
 func newTestClient(xInst runnable, tun io.ReadWriteCloser, routes ipTable, pipe pipe, stopTunnel func(chan error)) *Client {
 	expGateway := &net.IP{127, 0, 0, 2}
 	expProxy := &Proxy{IP: net.IP{127, 0, 0, 1}, Port: 10234}
-	expGeneralConfig := &xray.GeneralConfig{Address: "127.0.0.3"}
+	expGeneralConfig := &xkp.GeneralConfig{Address: "127.0.0.3"}
 
 	cl := &Client{
 		cfg: Config{

@@ -40,6 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	slog.Info("Connecting to VPN server")
 	err = vpn.Connect(clientLink)
 	if err != nil {
 		log.Fatal(err)

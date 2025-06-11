@@ -1,6 +1,6 @@
 # Go VPN client for XRay
 ![Static Badge](https://img.shields.io/badge/OS-macOS%20%7C%20Linux-blue?style=flat&logo=linux&logoColor=white&logoSize=auto&color=blue)
-![Static Badge](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go&logoColor=white)
+![Static Badge](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go&logoColor=white)
 [![Go Report Card](https://goreportcard.com/badge/github.com/goxray/tun)](https://goreportcard.com/report/github.com/goxray/tun)
 [![Go Reference](https://pkg.go.dev/badge/github.com/goxray/tun.svg)](https://pkg.go.dev/github.com/goxray/tun)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/goxray/tun/total?color=blue)
@@ -83,10 +83,10 @@ env CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -o goxray_cli_darwin_amd64 .
 
 To cross-compile from macOS to Linux arm/amd I use these commands:
 ```bash
-docker run --platform=linux/arm64 -v=${PWD}:/app --workdir=/app arm64v8/golang:1.23 env GOARCH=arm64 go build -o goxray_cli_linux_arm64 .
+docker run --platform=linux/arm64 -v=${PWD}:/app --workdir=/app arm64v8/golang:1.24 env GOARCH=arm64 go build -o goxray_cli_linux_arm64 .
 ```
 ```bash
-docker run --platform=linux/amd64 -v=${PWD}:/app --workdir=/app amd64/golang:1.23 env GOARCH=amd64 go build -o goxray_cli_linux_amd64 .
+docker run --platform=linux/amd64 -v=${PWD}:/app --workdir=/app amd64/golang:1.24 env GOARCH=amd64 go build -o goxray_cli_linux_amd64 .
 ```
 
 ## How it works

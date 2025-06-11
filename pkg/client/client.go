@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,10 +17,11 @@ import (
 	"github.com/goxray/core/network/tun"
 	"github.com/goxray/core/pipe2socks"
 	"github.com/jackpal/gateway"
-	"github.com/lilendian0x00/xray-knife/v2/xray"
+
+	xrayproto "github.com/lilendian0x00/xray-knife/v3/pkg/protocol"
+	"github.com/lilendian0x00/xray-knife/v3/pkg/xray"
 	xapplog "github.com/xtls/xray-core/app/log"
 	xcommlog "github.com/xtls/xray-core/common/log"
-	"github.com/xtls/xray-core/core"
 )
 
 const disconnectTimeout = 30 * time.Second
@@ -96,7 +98,7 @@ type Client struct {
 	cfg Config
 
 	xInst  runnable
-	xCfg   *xray.GeneralConfig
+	xCfg   *xrayproto.GeneralConfig
 	xSrvIP *net.IPAddr
 	tunnel io.ReadWriteCloser
 	pipe   pipe
@@ -298,12 +300,7 @@ func (c *Client) xrayToGatewayRoute() route.Opts {
 }
 
 // createXrayProxy creates XRay instance from connection link with additional proxy listening on {addr}:{port}.
-func (c *Client) createXrayProxy(link string) (*core.Instance, *xray.GeneralConfig, error) {
-	protocol, err := xray.ParseXrayConfig(link)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse config link: %w", err)
-	}
-
+func (c *Client) createXrayProxy(link string) (xrayproto.Instance, *xrayproto.GeneralConfig, error) {
 	// Make the inbound for local proxy.
 	// We will later use it to redirect all traffic from TUN device to this proxy.
 	inbound := &xray.Socks{
@@ -318,12 +315,22 @@ func (c *Client) createXrayProxy(link string) (*core.Instance, *xray.GeneralConf
 		xray.WithInbound(inbound),
 	)
 
-	inst, err := svc.MakeXrayInstance(protocol)
+	link = strings.TrimSpace(link)
+	protocol, err := svc.CreateProtocol(link)
 	if err != nil {
-		return nil, nil, fmt.Errorf("make instance: %w", err)
+		return nil, nil, fmt.Errorf("invalid config: protocol create: %w", err)
+	}
+
+	if err := protocol.Parse(); err != nil {
+		return nil, nil, fmt.Errorf("invalid config: parse: %w", err)
 	}
 
 	cfg := protocol.ConvertToGeneralConfig()
+
+	inst, err := svc.MakeInstance(protocol)
+	if err != nil {
+		return nil, nil, fmt.Errorf("make instance: %w", err)
+	}
 
 	// Validate xray proto addr.
 	ip, err := net.ResolveIPAddr("ip", cfg.Address)
