@@ -32,7 +32,7 @@ Please visit https://xtls.github.io/en for more info.
 ## ⚡️ Usage
 > [!IMPORTANT]
 > - `sudo` is required
-> - CGO_ENABLED=1 is required in order to build the project
+> - On linux set `sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip goxray_binary_path`
 
 ### Standalone application:
 
@@ -72,13 +72,13 @@ time.Sleep(60 * time.Second)
 
 The project compiles like a regular Go program:
 ```bash
-CGO_ENABLED=1 go build -o goxray_cli .
+go build -o goxray_cli .
 ```
 
 #### Cross-compilation
 
 ```bash
-env CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -o goxray_cli_darwin_amd64 .
+env GOOS=darwin GOARCH=amd64 go build -o goxray_cli_darwin_amd64 .
 ```
 
 To cross-compile from macOS to Linux arm/amd I use these commands:
