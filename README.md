@@ -29,6 +29,13 @@ Please visit https://xtls.github.io/en for more info.
 - Supports all [Xray-core](https://github.com/XTLS/Xray-core) protocols (vless, vmess e.t.c.) using link notation (`vless://` e.t.c.)
 - Only soft routing rules are applied, no changes made to default routes
 
+## 💿 Installation
+AUR
+```bash
+yay -S goxray-cli-git
+```
+maintainer: ogolknevnv@ya.ru
+
 ## ⚡️ Usage
 > [!IMPORTANT]
 > - `sudo` is required
