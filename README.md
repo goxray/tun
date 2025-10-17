@@ -68,6 +68,10 @@ time.Sleep(60 * time.Second)
 
 > Please refer to godoc for supported methods and types.
 
+### As a dockerized experience
+
+If you need to use it with Docker - you can look at [this proposed implementation](https://github.com/goxray/tun/pull/8).
+
 ## 🛠 Build
 
 The project compiles like a regular Go program:
