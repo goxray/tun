@@ -156,6 +156,11 @@ func newTestClient(xInst runnable, tun io.ReadWriteCloser, routes ipTable, pipe 
 		pipe:          pipe,
 		xCfg:          expGeneralConfig,
 	}
+	if expGeneralConfig.Address != "" {
+		if ipAddr, err := net.ResolveIPAddr("ip", expGeneralConfig.Address); err == nil {
+			cl.xSrvIP = ipAddr
+		}
+	}
 	if stopTunnel != nil {
 		cl.stopTunnel = func() {
 			go func() {

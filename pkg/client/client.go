@@ -68,6 +68,10 @@ type Config struct {
 	Logger *slog.Logger
 	// XRayLogType is used to redefine xray core log type (default: LogType_None).
 	XRayLogType xapplog.LogType
+	// Debug toggles runtime instrumentation useful for collecting diagnostics.
+	Debug bool
+	// DebugOptions allow to fine-tune instrumentation behavior.
+	DebugOptions DebugOptions
 }
 
 func (c *Config) apply(new *Config) {
@@ -89,6 +93,12 @@ func (c *Config) apply(new *Config) {
 	if new.XRayLogType != xapplog.LogType_None {
 		c.XRayLogType = new.XRayLogType
 	}
+	if new.Debug {
+		c.Debug = true
+	}
+	if new.DebugOptions != (DebugOptions{}) {
+		c.DebugOptions = new.DebugOptions
+	}
 }
 
 // Client is the actual VPN cl. It manages connections, routing and tunneling of the requests.
@@ -106,6 +116,10 @@ type Client struct {
 
 	tunnelStopped chan error
 	stopTunnel    func()
+
+	gwMu sync.RWMutex
+
+	debug debugState
 }
 
 // Proxy will set up XRay inbound.
@@ -136,18 +150,23 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("route new: %w", err)
 	}
 
-	return &Client{
+	client := &Client{
 		cfg: Config{
 			GatewayIP:    &gatewayIP,
 			InboundProxy: defaultInboundProxy,
 			TUNAddress:   defaultTUNAddress,
 			RoutesToTUN:  DefaultRoutesToTUN,
 			Logger:       slog.New(slog.NewTextHandler(os.Stdout, nil)),
+			DebugOptions: defaultDebugOptions(),
 		},
 		tunnelStopped: make(chan error),
 		pipe:          p,
 		routes:        r,
-	}, nil
+	}
+	client.syncDebugState()
+	client.pipe = wrapPipeWithDebug(client.pipe, client.cfg.Logger, client.cfg.Debug && client.cfg.DebugOptions.VerbosePipe)
+
+	return client, nil
 }
 
 // NewClientWithOpts initializes Client with specified Config. It is recommended to just use NewClient().
@@ -158,6 +177,8 @@ func NewClientWithOpts(cfg Config) (*Client, error) {
 	}
 
 	client.cfg.apply(&cfg)
+	client.syncDebugState()
+	client.pipe = wrapPipeWithDebug(client.pipe, client.cfg.Logger, client.cfg.Debug && client.cfg.DebugOptions.VerbosePipe)
 
 	return client, nil
 }
@@ -165,7 +186,11 @@ func NewClientWithOpts(cfg Config) (*Client, error) {
 // GatewayIP returns gateway IP used to route outbound traffic through.
 // It is used to route packets destined to XRay remote server.
 func (c *Client) GatewayIP() net.IP {
-	return *c.cfg.GatewayIP
+	if ip := c.currentGatewayIP(); ip != nil {
+		return ip
+	}
+
+	return nil
 }
 
 // TUNAddress returns address the TUN device is set up on.
@@ -232,11 +257,17 @@ func (c *Client) Connect(link string) error {
 	ctx, c.stopTunnel = context.WithCancel(context.Background())
 	go func() {
 		wg.Done()
-		c.tunnelStopped <- c.pipe.Copy(ctx, c.tunnel, c.cfg.InboundProxy.String())
-		c.cfg.Logger.Debug("tunnel pipe closed", "err", err)
+		pipeErr := c.pipe.Copy(ctx, c.tunnel, c.cfg.InboundProxy.String())
+		c.tunnelStopped <- pipeErr
+		if pipeErr != nil && !errors.Is(pipeErr, context.Canceled) {
+			c.cfg.Logger.Warn("tunnel pipe closed with error", "error", pipeErr)
+		} else {
+			c.cfg.Logger.Debug("tunnel pipe closed", "error", pipeErr)
+		}
 	}()
 	wg.Wait()
 	c.cfg.Logger.Debug("client connected")
+	c.startDebugging()
 
 	return nil
 }
@@ -250,6 +281,7 @@ func (c *Client) Disconnect(ctx context.Context) error {
 		return nil // not connected
 	}
 
+	c.stopDebugging()
 	c.stopTunnel()
 	err := errors.Join(c.xInst.Close(), c.tunnel.Close(), c.routes.Delete(c.xrayToGatewayRoute()))
 
@@ -295,8 +327,15 @@ func (c *Client) BytesWritten() int {
 // xrayToGatewayRoute is a setup to route VPN requests to gateway.
 // Used as exception to not interfere with traffic going to remote XRay instance.
 func (c *Client) xrayToGatewayRoute() route.Opts {
-	// Append "/32" to match only the XRay server route.
-	return route.Opts{Gateway: *c.cfg.GatewayIP, Routes: []*route.Addr{route.MustParseAddr(c.xSrvIP.String() + "/32")}}
+	gatewayIP := c.currentGatewayIP()
+	opts := route.Opts{
+		Routes: []*route.Addr{route.MustParseAddr(c.xSrvIP.String() + "/32")},
+	}
+	if gatewayIP != nil {
+		opts.Gateway = gatewayIP
+	}
+
+	return opts
 }
 
 // createXrayProxy creates XRay instance from connection link with additional proxy listening on {addr}:{port}.
