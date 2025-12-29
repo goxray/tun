@@ -155,6 +155,7 @@ func newTestClient(xInst runnable, tun io.ReadWriteCloser, routes ipTable, pipe 
 		routes:        routes,
 		pipe:          pipe,
 		xCfg:          expGeneralConfig,
+		xSrvIP:        &net.IPAddr{IP: net.ParseIP("127.0.0.3")},
 	}
 	if stopTunnel != nil {
 		cl.stopTunnel = func() {
