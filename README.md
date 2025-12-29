@@ -29,6 +29,22 @@ Please visit https://xtls.github.io/en for more info.
 - Supports all [Xray-core](https://github.com/XTLS/Xray-core) protocols (vless, vmess e.t.c.) using link notation (`vless://` e.t.c.)
 - Only soft routing rules are applied, no changes made to default routes
 
+## ⚡️ Installation
+
+The application can be used standalone, as compiled and thrown somewhere in the directory mentioned in PATH.
+
+##### 📦 3rd party Debian package (maintained by [twdragon](https://github.com/twdragon))
+
+The client is available from the PPA repository `ppa:twdragon/xray`, maintained by [twdragon](https://github.com/twdragon). The network privileges in specified automatically by the postinstall script. The package is in sync with this repo's release tags. You can check the pipeline at the [dedicated repository](https://github.com/twdragon/xray-debian-pkg). To install, use:
+
+```bash
+sudo add-apt-repository ppa:twdragon/xray
+sudo apt update
+sudo apt install goxray-cli
+```
+
+After the installation, the package might be updated automatically, as is done in Ubuntu. Packages are signed by [twdragon](https://github.com/twdragon) and published on [Launchpad](https://launchpad.net/~twdragon/+archive/ubuntu/xray). Experimental builds are also available in [pipeline repository](https://github.com/twdragon/xray-debian-pkg/actions).
+
 ## ⚡️ Usage
 > [!IMPORTANT]
 > - `sudo` is required
