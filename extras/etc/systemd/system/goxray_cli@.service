@@ -1,0 +1,28 @@
+[Unit]
+Description=goxray_cli VPN service for %i
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/goxray/%i.env
+ExecStart=/usr/local/bin/goxray_cli_linux_amd64
+User=xray
+Group=xray
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
