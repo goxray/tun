@@ -29,6 +29,9 @@ const disconnectTimeout = 30 * time.Second
 var (
 	// defaultTUNAddress is the address new TUN device will be set up with.
 	defaultTUNAddress = &net.IPNet{IP: net.IPv4(192, 18, 0, 1), Mask: net.IPv4Mask(255, 255, 255, 255)}
+	// defaultDNSServer is assigned to the TUN link so host DNS queries are
+	// resolved through the VPN.
+	defaultDNSServer = net.IPv4(1, 1, 1, 1)
 	// defaultInboundProxy default proxy will be set up for listening on 127.0.0.1.
 	defaultInboundProxy = &Proxy{
 		IP:   net.IPv4(127, 0, 0, 1),
@@ -58,6 +61,9 @@ type Config struct {
 	InboundProxy *Proxy
 	// TUN device address (default: 192.18.0.1).
 	TUNAddress *net.IPNet
+	// DNSServer is assigned to the TUN device and all host DNS queries are
+	// redirected to it, so DNS is resolved through the VPN (default: 1.1.1.1).
+	DNSServer *net.IP
 	// List of routes to be pointed to TUN device (default: DefaultRoutesToTUN).
 	//
 	// One exception is explicitly added for XRay remote server IP and can not be altered.
@@ -80,6 +86,9 @@ func (c *Config) apply(new *Config) {
 	if new.TUNAddress != nil {
 		c.TUNAddress = new.TUNAddress
 	}
+	if new.DNSServer != nil {
+		c.DNSServer = new.DNSServer
+	}
 	if new.Logger != nil {
 		c.Logger = new.Logger
 	}
@@ -97,12 +106,14 @@ func (c *Config) apply(new *Config) {
 type Client struct {
 	cfg Config
 
-	xInst  runnable
-	xCfg   *xrayproto.GeneralConfig
-	xSrvIP *net.IPAddr
-	tunnel io.ReadWriteCloser
-	pipe   pipe
-	routes ipTable
+	xInst   runnable
+	xCfg    *xrayproto.GeneralConfig
+	xSrvIP  *net.IPAddr
+	tunnel  io.ReadWriteCloser
+	pipe    pipe
+	routes  ipTable
+	dns     dnsManager
+	tunName string
 
 	tunnelStopped chan error
 	stopTunnel    func()
@@ -136,18 +147,22 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("route new: %w", err)
 	}
 
-	return &Client{
+	cl := &Client{
 		cfg: Config{
 			GatewayIP:    &gatewayIP,
 			InboundProxy: defaultInboundProxy,
 			TUNAddress:   defaultTUNAddress,
+			DNSServer:    &defaultDNSServer,
 			RoutesToTUN:  DefaultRoutesToTUN,
 			Logger:       slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		},
 		tunnelStopped: make(chan error),
 		pipe:          p,
 		routes:        r,
-	}, nil
+	}
+	cl.dns = newDNSManager(cl.cfg.Logger, cl.cfg.DNSServer)
+
+	return cl, nil
 }
 
 // NewClientWithOpts initializes Client with specified Config. It is recommended to just use NewClient().
@@ -158,6 +173,7 @@ func NewClientWithOpts(cfg Config) (*Client, error) {
 	}
 
 	client.cfg.apply(&cfg)
+	client.dns = newDNSManager(client.cfg.Logger, client.cfg.DNSServer)
 
 	return client, nil
 }
@@ -226,6 +242,24 @@ func (c *Client) Connect(link string) error {
 	}
 	c.cfg.Logger.Debug("routing xray server IP to default route")
 
+	c.cfg.Logger.Debug("setting up DNS on TUN device")
+	if err = c.dns.Setup(c.tunName); err != nil {
+		c.cfg.Logger.Error("DNS setup failed", "err", err)
+
+		cleanupErr := errors.Join(
+			c.dns.Teardown(c.tunName),
+			c.tunnel.Close(),
+			c.routes.Delete(c.xrayToGatewayRoute()),
+			c.xInst.Close(),
+		)
+		if cleanupErr != nil {
+			c.cfg.Logger.Error("cleanup after DNS setup failure failed", "err", cleanupErr)
+		}
+
+		return fmt.Errorf("setup DNS on TUN device: %w", err)
+	}
+	c.cfg.Logger.Debug("host DNS redirected to TUN device")
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	var ctx context.Context
@@ -251,7 +285,14 @@ func (c *Client) Disconnect(ctx context.Context) error {
 	}
 
 	c.stopTunnel()
-	err := errors.Join(c.xInst.Close(), c.tunnel.Close(), c.routes.Delete(c.xrayToGatewayRoute()))
+	err := errors.Join(
+		c.xInst.Close(),
+		// DNS settings must be reverted before the tunnel is closed: closing
+		// the TUN device removes the interface resolvectl acts on.
+		c.dns.Teardown(c.tunName),
+		c.tunnel.Close(),
+		c.routes.Delete(c.xrayToGatewayRoute()),
+	)
 
 	// Waiting till the tunnel actually done with processing connections.
 	ctx, cancel := context.WithTimeout(ctx, disconnectTimeout)
@@ -365,6 +406,7 @@ func (c *Client) setupTunnel() (*tun.Interface, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create tun: %w", err)
 	}
+	c.tunName = ifc.Name()
 
 	if err = ifc.Up(c.cfg.TUNAddress, c.cfg.TUNAddress.IP); err != nil {
 		return nil, fmt.Errorf("setup interface: %w", err)

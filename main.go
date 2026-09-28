@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,7 +17,24 @@ var cmdArgsErr = `ERROR: no config_link provided
 usage: %s <config_url>
   - config_url - xray connection link, like "vless://example..."
   - or set GOXRAY_CONFIG_URL env var
+  - GOXRAY_CONFIG_DNS - optional DNS server IP resolved through the VPN (default: 1.1.1.1)
 `
+
+// dnsServerFromEnv returns the host DNS server from the GOXRAY_CONFIG_DNS env
+// var. Nil when unset - the client then falls back to its default (1.1.1.1).
+func dnsServerFromEnv() (*net.IP, error) {
+	value := os.Getenv("GOXRAY_CONFIG_DNS")
+	if value == "" {
+		return nil, nil
+	}
+
+	ip := net.ParseIP(value)
+	if ip == nil {
+		return nil, fmt.Errorf("GOXRAY_CONFIG_DNS is not a valid IP address: %q", value)
+	}
+
+	return &ip, nil
+}
 
 func main() {
 	// Get connection link from first cmd argument or env var.
@@ -38,8 +56,14 @@ func main() {
 		Level: slog.LevelError,
 	}))
 
+	dnsServer, err := dnsServerFromEnv()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	vpn, err := client.NewClientWithOpts(client.Config{
 		TLSAllowInsecure: false,
+		DNSServer:        dnsServer,
 		Logger:           logger,
 	})
 	if err != nil {

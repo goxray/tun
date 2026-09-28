@@ -59,6 +59,11 @@ sudo go run . <proto_link>
 
 Where `proto_link` is your XRay link (like `vless://example.com...`), you can get this from your VPN provider or get it from your XRay server.
 
+The DNS server resolved through the VPN is `1.1.1.1` by default. Override it with the `GOXRAY_CONFIG_DNS` env var (an IP address):
+```bash
+sudo GOXRAY_CONFIG_DNS=8.8.8.8 go run . <proto_link>
+```
+
 ### As library in your own project:
 > [!NOTE]
 > This project is built upon the `core` package, see details and documentation at https://github.com/goxray/core

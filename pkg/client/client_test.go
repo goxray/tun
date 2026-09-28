@@ -34,7 +34,7 @@ func TestConnect_InvalidLink(t *testing.T) {
 }
 
 func TestDisconnect_NonConnected(t *testing.T) {
-	cl := newTestClient(nil, nil, nil, nil, nil)
+	cl := newTestClient(nil, nil, nil, nil, nil, nil)
 	require.NoError(t, cl.Disconnect(context.Background()))
 }
 
@@ -126,8 +126,10 @@ func TestDisconnect_CtxTimeout(t *testing.T) {
 			pipeMock := mocks.NewMockpipe(gomock.NewController(t))
 			routesMock := mocks.NewMockipTable(gomock.NewController(t))
 			tunMock := mocks.NewMockioReadWriteCloser(gomock.NewController(t))
+			dnsMock := mocks.NewMockdnsManager(gomock.NewController(t))
+			dnsMock.EXPECT().Teardown("tun0").Return(nil)
 
-			cl := newTestClient(xInstMock, tunMock, routesMock, pipeMock, test.stopTunFunc)
+			cl := newTestClient(xInstMock, tunMock, routesMock, pipeMock, test.stopTunFunc, dnsMock)
 			test.setupMocks(cl, xInstMock, pipeMock, routesMock, tunMock)
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
@@ -138,7 +140,26 @@ func TestDisconnect_CtxTimeout(t *testing.T) {
 	}
 }
 
-func newTestClient(xInst runnable, tun io.ReadWriteCloser, routes ipTable, pipe pipe, stopTunnel func(chan error)) *Client {
+func TestDisconnect_TearsDownDNS(t *testing.T) {
+	xInstMock := mocks.NewMockrunnable(gomock.NewController(t))
+	pipeMock := mocks.NewMockpipe(gomock.NewController(t))
+	routesMock := mocks.NewMockipTable(gomock.NewController(t))
+	tunMock := mocks.NewMockioReadWriteCloser(gomock.NewController(t))
+	dnsMock := mocks.NewMockdnsManager(gomock.NewController(t))
+
+	cl := newTestClient(xInstMock, tunMock, routesMock, pipeMock, func(stopped chan error) {
+		stopped <- nil
+	}, dnsMock)
+
+	xInstMock.EXPECT().Close().Return(nil)
+	tunMock.EXPECT().Close().Return(nil)
+	dnsMock.EXPECT().Teardown("tun0").Return(errors.New("dns teardown err"))
+	mockSuccessDisconnectIP(t, cl, routesMock)
+
+	require.ErrorContains(t, cl.Disconnect(context.Background()), "dns teardown err")
+}
+
+func newTestClient(xInst runnable, tun io.ReadWriteCloser, routes ipTable, pipe pipe, stopTunnel func(chan error), dns dnsManager) *Client {
 	expGateway := &net.IP{127, 0, 0, 2}
 	expProxy := &Proxy{IP: net.IP{127, 0, 0, 1}, Port: 10234}
 	expGeneralConfig := &xkp.GeneralConfig{Address: "127.0.0.3"}
@@ -154,6 +175,8 @@ func newTestClient(xInst runnable, tun io.ReadWriteCloser, routes ipTable, pipe 
 		tunnel:        tun,
 		routes:        routes,
 		pipe:          pipe,
+		dns:           dns,
+		tunName:       "tun0",
 		xCfg:          expGeneralConfig,
 		xSrvIP:        &net.IPAddr{IP: net.ParseIP("127.0.0.3")},
 	}
