@@ -25,6 +25,14 @@ type runnable interface {
 	xcommon.Runnable
 }
 
+type dnsManager interface {
+	// Setup redirects host DNS queries for the TUN link so they are resolved
+	// through the VPN instead of the physical link.
+	Setup(ifName string) error
+	// Teardown reverts host DNS redirection applied by Setup.
+	Teardown(ifName string) error
+}
+
 //nolint:unused
 type ioReadWriteCloser interface {
 	io.ReadWriteCloser

@@ -280,6 +280,106 @@ func (c *MockrunnableStartCall) DoAndReturn(f func() error) *MockrunnableStartCa
 	return c
 }
 
+// MockdnsManager is a mock of dnsManager interface.
+type MockdnsManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockdnsManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockdnsManagerMockRecorder is the mock recorder for MockdnsManager.
+type MockdnsManagerMockRecorder struct {
+	mock *MockdnsManager
+}
+
+// NewMockdnsManager creates a new mock instance.
+func NewMockdnsManager(ctrl *gomock.Controller) *MockdnsManager {
+	mock := &MockdnsManager{ctrl: ctrl}
+	mock.recorder = &MockdnsManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockdnsManager) EXPECT() *MockdnsManagerMockRecorder {
+	return m.recorder
+}
+
+// Setup mocks base method.
+func (m *MockdnsManager) Setup(ifName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Setup", ifName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Setup indicates an expected call of Setup.
+func (mr *MockdnsManagerMockRecorder) Setup(ifName any) *MockdnsManagerSetupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Setup", reflect.TypeOf((*MockdnsManager)(nil).Setup), ifName)
+	return &MockdnsManagerSetupCall{Call: call}
+}
+
+// MockdnsManagerSetupCall wrap *gomock.Call
+type MockdnsManagerSetupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockdnsManagerSetupCall) Return(arg0 error) *MockdnsManagerSetupCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockdnsManagerSetupCall) Do(f func(string) error) *MockdnsManagerSetupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockdnsManagerSetupCall) DoAndReturn(f func(string) error) *MockdnsManagerSetupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Teardown mocks base method.
+func (m *MockdnsManager) Teardown(ifName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Teardown", ifName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Teardown indicates an expected call of Teardown.
+func (mr *MockdnsManagerMockRecorder) Teardown(ifName any) *MockdnsManagerTeardownCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Teardown", reflect.TypeOf((*MockdnsManager)(nil).Teardown), ifName)
+	return &MockdnsManagerTeardownCall{Call: call}
+}
+
+// MockdnsManagerTeardownCall wrap *gomock.Call
+type MockdnsManagerTeardownCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockdnsManagerTeardownCall) Return(arg0 error) *MockdnsManagerTeardownCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockdnsManagerTeardownCall) Do(f func(string) error) *MockdnsManagerTeardownCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockdnsManagerTeardownCall) DoAndReturn(f func(string) error) *MockdnsManagerTeardownCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockioReadWriteCloser is a mock of ioReadWriteCloser interface.
 type MockioReadWriteCloser struct {
 	ctrl     *gomock.Controller
